@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Utils where
 import Control.Arrow (Arrow(first))
@@ -6,6 +5,7 @@ import Data
 
 import System.IO.Unsafe  -- be careful!                                          
 import System.Random 
+import Control.Exception (assert)
 
 length' :: (Num b) => [a] -> b
 length' [] = 0
@@ -14,26 +14,31 @@ length' (_:xs) = 1 + length' xs
 first' :: [a]->a
 first' (x:xs) = x
 
-
-myRandom :: Int -> Int ->Int 
-myRandom min max = unsafePerformIO (getStdRandom (randomR (min, max)))
-
+remove :: (Eq a) => [a] -> a -> [a]
+remove l n = [ x | x <- l , x /= n]
 
 
+initRandom = mkStdGen
+
+myRandom :: Int -> Int -> StdGen  ->(Int,StdGen) 
+myRandom min max  = randomR (min, (max-1)) 
+
+
+directions = [Up,Down,L,R,UpLeft ,UpRight,DownLeft,DownRight]
 
 move :: Coord -> Moves -> Coord 
-move (x,y) L          = (x-1,y)
-move (x,y) R          = (x+1,y)
-move (x,y) Up         = (x,y-1) 
-move (x,y) Down       = (x,y+1)
+move (x,y) Up         = (x-1,y)
+move (x,y) Down       = (x+1,y)
+move (x,y) R          = (x,y+1) 
+move (x,y) L          = (x,y-1)
 move (x,y) UpLeft     = (x-1,y-1)
-move (x,y) UpRight    = (x+1,y-1)
-move (x,y) DownLeft   = (x-1,y+1)
+move (x,y) UpRight    = (x-1,y+1)
+move (x,y) DownLeft   = (x+1,y-1)
 move (x,y) DownRight  = (x+1,y+1)
-move (x,y) UpUp       = (x,y-2)
-move (x,y) DownDown   = (x,y+2)
-move (x,y) LeftLeft   = (x-2,y)
-move (x,y) RightRight = (x+2,y)
+move (x,y) UpUp       = (x-2,y)
+move (x,y) DownDown   = (x+2,y)
+move (x,y) LeftLeft   = (x,y-2)
+move (x,y) RightRight = (x,y+2)
 
 
 
@@ -55,10 +60,21 @@ findNeighbors :: Coord ->[Coord]  -> [Coord]
 findNeighbors coord  ((m,n):rest) = filter checkInside  (rest ++ [(move coord Up) ,(move coord  Down),(move coord L),(move coord  R) ] )
                                         where checkInside coord2 = isInside coord2 m n
 
+findNeighbors8 :: Coord -> Coord  -> [Coord]
+findNeighbors8 coord  (m,n) = filter checkInside  (map (move coord) (directions) )
+                                        where checkInside coord2 = isInside coord2 m n
 
 isInside :: Coord -> Int -> Int -> Bool
 isInside (x,y) m n = x>=0 && x <m && y>=0 &&y<n  
 
+
+assertProb::Int -> [a] -> StdGen -> [a]
+assertProb _ [] _ = []
+assertProb prob (c:rest) gen = 
+       let 
+          (var,gen2) = myRandom 0 100 gen
+       in if prob > var then c: assertProb prob rest gen2 else  assertProb prob rest gen2
+      
 
 
 data Queue a = Queue [a] deriving (Show)

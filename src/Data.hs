@@ -1,5 +1,5 @@
 module Data where
-
+import System.Random
 
 type Coord = (Int, Int)
 
@@ -7,12 +7,17 @@ data Environment = Environment {
                     size    :: Coord
                 ,   robot  :: Coord
                 ,   robotWithKid  :: Coord
+                ,   isHoldingKid ::Bool
                 ,   kids   :: [Coord]
                 ,   crib  :: [Coord]
                 ,   fullCrib :: [Coord]
                 ,   dirty :: [Coord]
                 ,   obstacle :: [Coord]
                 ,   empty ::[Coord]
+                ,   remaininKids :: Int 
+                ,   moveKidProb :: Int
+                ,   dirtProb :: Int
+                ,  randomGen :: StdGen
                 } deriving (Eq ,Show)
 
 
