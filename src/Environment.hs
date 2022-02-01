@@ -5,8 +5,27 @@ import Control.Monad (guard)
 import Debug.Trace (trace)
 import Utils
 import System.Random
+import Kid
+import Robot
 
 -- import Utils
+
+data Environment = Environment {
+                    size    :: Coord
+                ,   robot  :: Robot
+                ,   kids   :: [Kid]
+                ,   crib  :: [Coord]
+                ,   fullCrib :: [Coord]
+                ,   dirty :: [Coord]
+                ,   obstacle :: [Coord]
+                ,   empty ::[Coord]
+                ,   remaininKids :: Int 
+                ,   moveKidProb :: Int
+                ,   dirtProb :: Int
+                ,  randomGen :: StdGen
+                } deriving (Eq ,Show)
+
+
 
 
 
@@ -18,25 +37,23 @@ generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKid
         totalDirt = div  ( dirtPercentage * m * n )  100
         empty = emptyEnvironment m n dirtProb moveKidProb
         crib = generateCrib empty m n kids
-        obs = generateObstacles crib m n totalObst
-        dirt = generateDirt obs m n totalDirt
-        kid = generateKids dirt  m n kids
-        env = putRobot kid m n
-    in env
+        obs =   generateObstacles crib totalObst
+        dirt = generateDirt obs  totalDirt
+        kid = generateKids dirt  kids
+        env = putRobot kid 
+    in  env
 
 
 testEnvironment ::  Environment 
 testEnvironment  = Environment { 
     size = (4,5)
-    , robot = (0,0)
-    , robotWithKid = (0,0)
-    , kids = [(2,1),(2,3)]
+    , robot = Robot{pos = (0,0), isHoldingKid = False}
+    , kids = [initKid (2,1),initKid (2,3)]
     , crib = []
     , fullCrib = []
     , dirty = []
     , obstacle = [(1,2)]
     , empty =  [(0,1),(1,1),(0,2),(0,3),(0,4),(1,0),(1,4),(2,0),(1,3),(2,2),(2,4),(3,0),(3,1),(3,2),(3,3),(3,4)]
-    ,isHoldingKid = False
     , dirtProb = 100
     , moveKidProb = 10
     , remaininKids = 1
@@ -46,16 +63,14 @@ testEnvironment  = Environment {
 
 emptyEnvironment ::Int -> Int -> Int -> Int -> Environment 
 emptyEnvironment m n dirtProb moveKidProb  = Environment { 
-    size = (m-1,n-1)
-    , robot = (0,0)
-    , robotWithKid = (0,0)
+    size = (m,n)
+    , robot = Robot{pos = (0,0), isHoldingKid = False}
     , kids = []
     , crib = []
     , fullCrib = []
     , dirty = []
     , obstacle = []
-    , empty = initEmptys m n n []
-    ,isHoldingKid = False
+    , empty = initEmptys (m-1) (n-1)  (n-1) []
     , dirtProb = dirtProb
     , moveKidProb = moveKidProb
     , remaininKids = 0
@@ -69,17 +84,18 @@ initEmptys m n n2 result
                     | otherwise = initEmptys m (n-1) n2 ((m,n):result)
 
 
-putRobot::Environment -> Int -> Int  -> Environment 
-putRobot env m n =
-    let   
-        (x,gen) = myRandom 0 n (randomGen env) 
-        (y,gen2) = myRandom 0 m gen
-    in if (x,y) `elem` empty  env 
-        then 
-            let emptyNew = remove (empty env) (x,y) 
-                envNew = env{empty = emptyNew}  
-            in env{robot=(x,y) , empty =  emptyNew ,randomGen = gen2}
-        else putRobot env m n 
+putRobot::Environment  -> Environment 
+putRobot env  =
+     let 
+        emptyOld = empty env
+        (rnd,gen) = myRandom 0 (length' emptyOld) (randomGen env) 
+        elem = (emptyOld)!!rnd
+        emptyNew = remove emptyOld elem
+        itemNew = Robot elem False 
+        env2 = env{empty =emptyNew , robot = itemNew , randomGen = gen} 
+      
+    in env2
+  
 
 generateCrib :: Environment -> Int -> Int ->Int  -> Environment
 generateCrib env  m n kids  = 
@@ -91,65 +107,45 @@ generateCrib env  m n kids  =
         emptyNew = filter (`notElem` c) emptyOld
     in env{crib  = c , empty =  emptyNew ,randomGen = gen2} 
 
-generateObstacles :: Environment ->Int -> Int -> Int -> Environment 
-generateObstacles =generateObstacles2 []
 
-generateObstacles2::[Coord] -> Environment ->Int -> Int -> Int -> Environment 
-generateObstacles2 obsL env m n 0  = 
+generateObstacles:: Environment -> Int -> Environment 
+generateObstacles env 0  = env
+generateObstacles env items = 
     let 
         emptyOld = empty env
-        emptyNew = filter (`notElem` obsL) emptyOld
-    in env{obstacle=obsL , empty =  emptyNew}
-generateObstacles2 obsL env m n obs = 
-    let count = obs   
-        (x,gen) = myRandom 0 n (randomGen env) 
-        (y,gen2) = myRandom 0 m gen
-    in if (x,y) `elem` empty  env  
-        then 
-            let emptyNew = remove (empty env) (x,y) 
-                envNew = env{empty = emptyNew  ,randomGen = gen2}  
-            in generateObstacles2 ((x,y):obsL) envNew m n (obs-1) 
-        else  generateObstacles2 obsL env m n obs
+        (rnd,gen) = myRandom 0 (length' emptyOld) (randomGen env) 
+        elem = (emptyOld)!!rnd
+        emptyNew = remove emptyOld elem
+        itemNew = elem:obstacle env 
+        env2 = env{empty =emptyNew , obstacle = itemNew , randomGen = gen} 
+      
+    in generateObstacles env2  (items-1)
 
-generateKids :: Environment ->Int -> Int -> Int -> Environment 
-generateKids =generateKids2 []
-
-generateKids2::[Coord] -> Environment ->Int -> Int -> Int -> Environment 
-generateKids2 obsL env m n 0  = 
+generateKids:: Environment -> Int -> Environment 
+generateKids env 0  = env
+generateKids env items = 
     let 
         emptyOld = empty env
-        emptyNew = filter (`notElem` obsL) emptyOld
-    in env{ kids=obsL , empty =  emptyNew, remaininKids = length' obsL }
-generateKids2 obsL env m n obs = 
-    let count = obs   
-        (x,gen) = myRandom 0 n (randomGen env) 
-        (y,gen2) = myRandom 0 m gen
-    in if (x,y) `elem` empty  env  
-        then 
-            let emptyNew = remove (empty env) (x,y) 
-                envNew = env{empty = emptyNew ,randomGen = gen2}  
-            in generateKids2 ((x,y):obsL) envNew m n (obs-1) 
-        else  generateKids2 obsL env m n obs
+        (rnd,gen) = myRandom 0 (length' emptyOld) (randomGen env) 
+        elem = (emptyOld)!!rnd
+        emptyNew = remove emptyOld elem
+        itemNew = (initKid elem): kids env 
+        env2 = env{empty =emptyNew , kids = itemNew , randomGen = gen} 
+      
+    in generateKids env2  (items-1)
 
-generateDirt :: Environment ->Int -> Int -> Int -> Environment 
-generateDirt =generateDirt2 []
-
-generateDirt2::[Coord] -> Environment ->Int -> Int -> Int -> Environment 
-generateDirt2 obsL env m n 0  = 
+generateDirt:: Environment -> Int -> Environment 
+generateDirt env 0  = env
+generateDirt env items = 
     let 
         emptyOld = empty env
-        emptyNew = filter (`notElem` obsL) emptyOld
-    in env{dirty=obsL , empty =  emptyNew}
-generateDirt2 obsL env m n obs = 
-    let count = obs   
-        (x,gen) = myRandom 0 n (randomGen env) 
-        (y,gen2) = myRandom 0 m gen
-    in if (x,y) `elem` empty  env  
-        then 
-            let emptyNew = remove (empty env) (x,y) 
-                envNew = env{empty = emptyNew,randomGen = gen2}  
-            in generateDirt2 ((x,y):obsL) envNew m n (obs-1) 
-        else  generateDirt2 obsL env m n obs
+        (rnd,gen) = myRandom 0 (length' emptyOld) (randomGen env) 
+        elem = (emptyOld)!!rnd
+        emptyNew = remove emptyOld elem
+        itemNew = elem:dirty env 
+        env2 = env{empty =emptyNew , dirty = itemNew , randomGen = gen} 
+      
+    in generateDirt env2  (items-1)
 
 
 
@@ -176,6 +172,8 @@ renderToConsole =
   putStrLn . showEnvironment
 
 
+-- variateEnvironment::Environment -> Environment
+
 
 
 moveKid::Environment -> Coord -> Int -> Environment
@@ -187,7 +185,7 @@ moveKid env (x,y) dirtProb =
               emptyOld = empty env2
               emptyNew = (x,y):(remove emptyOld newPos)
               kidsOld = kids env2
-              kidsNew = (newPos):(remove kidsOld (x,y))
+              kidsNew = (initKid newPos):(remove kidsOld (initKid (x,y)))
               envIfCanMov = env2{kids =kidsNew , empty = emptyNew}
               envIfCanMovPutDirt = putDirt envIfCanMov (x,y) newPos dirtProb 
               envPutDirt = putDirt env (x,y) (x,y) dirtProb 
@@ -197,7 +195,7 @@ moveKid env (x,y) dirtProb =
               emptyOld = empty env
               emptyNew = (x,y):(remove emptyOld newPos)
               kidsOld = kids env
-              kidsNew = (newPos):(remove kidsOld (x,y))
+              kidsNew = (initKid newPos):(remove kidsOld (initKid (x,y)))
               env2 = env{kids =kidsNew , empty = emptyNew}
               envPutDirt = putDirt env2 (x,y) newPos dirtProb 
             in  trace("Emty and move ") envPutDirt{randomGen = gen}
@@ -205,14 +203,14 @@ moveKid env (x,y) dirtProb =
     else trace("else ")  env{randomGen = gen}
     
     
-    where (rnd,gen) =  myRandom 0 8 (randomGen env )
+    where (rnd,gen) =  myRandom 0 4 (randomGen env )
           newDir =  directions !! rnd
           newPos = move (x,y) newDir
           m = fst (size env) 
           n = snd (size env)
           
 
-moveObstacle:: Environment -> Coord -> Moves ->(Environment,Bool )
+moveObstacle:: Environment -> Coord -> Direction ->(Environment,Bool )
 moveObstacle env coord dir 
     | isInside newPos m n && isEmpty env newPos = 
         let 
@@ -220,7 +218,7 @@ moveObstacle env coord dir
             emptys = coord:remove (empty env) newPos 
             env2 = env { obstacle = obstacles, empty = emptys}
             
-        in trace ("Here " ++ show newPos) (env2,True )
+        in  (env2,True )
     | isInside newPos m n && isObstacle env newPos &&  snd (moveObstacle env newPos dir)  =
         let 
             env1= fst (moveObstacle env newPos dir)
@@ -228,8 +226,8 @@ moveObstacle env coord dir
             emptys = coord:remove (empty env1) newPos 
             env2 = env { obstacle = obstacles, empty = emptys}
             
-        in  trace ("Here2 " ++ show newPos) (env2,True )
-    | otherwise =trace ("Here3 " ++ show newPos) (env,False )
+        in  (env2,True )
+    | otherwise = (env,False )
     where 
         newPos =  move coord dir
         m = fst (size env) 
@@ -268,7 +266,7 @@ putDirt env (x,y) (posKidX,posKidy) dirtProb  =
                 
 
                     
-                   
+              
         dirtyCells =(dirty env)++  assertProb dirtProb dirtTargets (randomGen env)
         emptyOld = empty env
         emptyNew = filter (`notElem` dirtyCells) emptyOld
@@ -278,10 +276,10 @@ putDirt env (x,y) (posKidX,posKidy) dirtProb  =
 
 
 isRobot :: Environment -> Coord  -> Bool
-isRobot env coord = robot env ==coord && not (isHoldingKid env)
+isRobot env coord = pos (robot env) ==coord && not (isHoldingKid (robot env))
 
 isRobotWithKid :: Environment -> Coord  -> Bool
-isRobotWithKid  env coord = robotWithKid env ==coord && isHoldingKid env
+isRobotWithKid  env coord = pos (robot env) ==coord && not (isHoldingKid (robot env))
 
 
 isEmpty :: Environment -> Coord  -> Bool
@@ -289,7 +287,7 @@ isEmpty env coord = coord `elem` empty env
 
 
 isKid :: Environment -> Coord  -> Bool
-isKid  env coord= coord `elem` kids env 
+isKid  env coord= coord `elem` (map position (kids env)) 
 
 isCrib :: Environment -> Coord  -> Bool
 isCrib  env coord= coord `elem` crib  env 

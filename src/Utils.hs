@@ -26,7 +26,7 @@ myRandom min max  = randomR (min, (max-1))
 
 directions = [Up,Down,L,R,UpLeft ,UpRight,DownLeft,DownRight]
 
-move :: Coord -> Moves -> Coord 
+move :: Coord -> Direction -> Coord 
 move (x,y) Up         = (x-1,y)
 move (x,y) Down       = (x+1,y)
 move (x,y) R          = (x,y+1) 
@@ -75,6 +75,11 @@ assertProb prob (c:rest) gen =
           (var,gen2) = myRandom 0 100 gen
        in if prob > var then c: assertProb prob rest gen2 else  assertProb prob rest gen2
       
+
+
+
+
+
 
 
 data Queue a = Queue [a] deriving (Show)
