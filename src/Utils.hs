@@ -68,12 +68,17 @@ isInside :: Coord -> Int -> Int -> Bool
 isInside (x,y) m n = x>=0 && x <m && y>=0 &&y<n  
 
 
-assertProb::Int -> [a] -> StdGen -> [a]
-assertProb _ [] _ = []
+assertProb::Int -> [a] -> StdGen -> ([a],StdGen)
+assertProb _ [] gen = ([],gen)
 assertProb prob (c:rest) gen = 
        let 
           (var,gen2) = myRandom 0 100 gen
-       in if prob > var then c: assertProb prob rest gen2 else  assertProb prob rest gen2
+       in if prob > var then 
+              let
+                  (list,gen) =   assertProb prob rest gen2
+                  result = (c:list,gen)
+              in result
+          else  assertProb prob rest gen2
       
 
 

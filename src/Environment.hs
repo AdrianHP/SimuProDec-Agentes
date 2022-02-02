@@ -23,25 +23,10 @@ data Environment = Environment {
                 ,   moveKidProb :: Int
                 ,   dirtProb :: Int
                 ,  randomGen :: StdGen
+                ,  time ::Int
+                ,  turn ::Int
                 } deriving (Eq ,Show)
 
-
-
-
-
-
-generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Environment
-generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb =
-    let 
-        totalObst = div (obstaclesPercentage * m * n)  100
-        totalDirt = div  ( dirtPercentage * m * n )  100
-        empty = emptyEnvironment m n dirtProb moveKidProb
-        crib = generateCrib empty m n kids
-        obs =   generateObstacles crib totalObst
-        dirt = generateDirt obs  totalDirt
-        kid = generateKids dirt  kids
-        env = putRobot kid 
-    in  env
 
 
 testEnvironment ::  Environment 
@@ -58,11 +43,27 @@ testEnvironment  = Environment {
     , moveKidProb = 10
     , remaininKids = 1
     , randomGen =mkStdGen 10
+    , time = 0
+    , turn = 0
     }
 
 
-emptyEnvironment ::Int -> Int -> Int -> Int -> Environment 
-emptyEnvironment m n dirtProb moveKidProb  = Environment { 
+
+generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int ->Int -> Environment
+generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb t =
+    let 
+        totalObst = div (obstaclesPercentage * m * n)  100
+        totalDirt = div  ( dirtPercentage * m * n )  100
+        empty = emptyEnvironment m n dirtProb moveKidProb t
+        crib = generateCrib empty m n kids
+        obs =   generateObstacles crib totalObst
+        dirt = generateDirt obs  totalDirt
+        kid = generateKids dirt  kids
+        env = putRobot kid 
+    in  env
+
+emptyEnvironment ::Int -> Int -> Int -> Int -> Int -> Environment 
+emptyEnvironment m n dirtProb moveKidProb t  = Environment { 
     size = (m,n)
     , robot = Robot{pos = (0,0), isHoldingKid = False}
     , kids = []
@@ -75,6 +76,8 @@ emptyEnvironment m n dirtProb moveKidProb  = Environment {
     , moveKidProb = moveKidProb
     , remaininKids = 0
     , randomGen =mkStdGen 10
+    , time = t
+    , turn = 0
     }
 
 initEmptys :: Int -> Int -> Int -> [Coord] ->[Coord]
@@ -82,7 +85,6 @@ initEmptys 0 0 n2 result = (0,0):result
 initEmptys m n n2 result 
                     | n==0 = initEmptys (m-1) n2 n2 ((m,n):result)
                     | otherwise = initEmptys m (n-1) n2 ((m,n):result)
-
 
 putRobot::Environment  -> Environment 
 putRobot env  =
@@ -95,7 +97,6 @@ putRobot env  =
         env2 = env{empty =emptyNew , robot = itemNew , randomGen = gen} 
       
     in env2
-  
 
 generateCrib :: Environment -> Int -> Int ->Int  -> Environment
 generateCrib env  m n kids  = 
@@ -106,7 +107,6 @@ generateCrib env  m n kids  =
         emptyOld = empty env
         emptyNew = filter (`notElem` c) emptyOld
     in env{crib  = c , empty =  emptyNew ,randomGen = gen2} 
-
 
 generateObstacles:: Environment -> Int -> Environment 
 generateObstacles env 0  = env
@@ -172,8 +172,31 @@ renderToConsole =
   putStrLn . showEnvironment
 
 
--- variateEnvironment::Environment -> Environment
+-- passTime::Environment -> Environment
+-- passTime = variateEnvironment $ variateAgents env
 
+variateEnvironment::Environment -> Environment
+variateEnvironment env = env
+
+agentsActions::Environment -> Environment
+agentsActions env = env
+
+kidsActions::Environment -> Environment
+kidsActions env =
+    let 
+        moveProb = moveKidProb env
+        (temp,gen) = assertProb moveProb (kids env) (randomGen env)
+        kidsToMove = map position temp 
+        envAfterMove = moveAllKids env kidsToMove
+        i =  trace("kids to move" ++show kidsToMove ++ show envAfterMove)
+    in envAfterMove
+
+moveAllKids::Environment -> [Coord] -> Environment
+moveAllKids env [] = env
+moveAllKids env (k:kids) = 
+    let 
+        env2 = moveKid env k (dirtProb env)
+    in moveAllKids env2 kids  
 
 
 moveKid::Environment -> Coord -> Int -> Environment
@@ -249,7 +272,7 @@ putDirt env (x,y) (posKidX,posKidy) dirtProb  =
                     in  [freeCells!!rnd]
                 else []
             | kids == 1 = 
-                 if freeCellsCount < 3 then
+                 if freeCellsCount <= 3 then
                     freeCells
                 else 
                     let
@@ -267,10 +290,11 @@ putDirt env (x,y) (posKidX,posKidy) dirtProb  =
 
                     
               
-        dirtyCells =(dirty env)++  assertProb dirtProb dirtTargets (randomGen env)
+        (dirtyCells,gen) =  assertProb dirtProb dirtTargets (randomGen env)
+        dirtyCells2 = dirtyCells++(dirty env)
         emptyOld = empty env
-        emptyNew = filter (`notElem` dirtyCells) emptyOld
-    in env{dirty = dirtyCells,empty = emptyNew }
+        emptyNew = filter (`notElem` dirtyCells2) emptyOld
+    in env{dirty = dirtyCells2,empty = emptyNew }
       
 
 
