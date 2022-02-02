@@ -8,7 +8,8 @@ import System.Random
 import Kid
 import Robot
 
--- import Utils
+
+---Environment structure
 
 data Environment = Environment {
                     size    :: Coord
@@ -27,6 +28,10 @@ data Environment = Environment {
                 ,  turn ::Int
                 } deriving (Eq ,Show)
 
+-------------------------------------------
+
+
+-- Generator-------------------------------
 
 
 testEnvironment ::  Environment 
@@ -48,13 +53,12 @@ testEnvironment  = Environment {
     }
 
 
-
-generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int ->Int -> Environment
-generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb t =
+generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int ->Int -> Int -> Environment
+generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb t rndSeed =
     let 
         totalObst = div (obstaclesPercentage * m * n)  100
         totalDirt = div  ( dirtPercentage * m * n )  100
-        empty = emptyEnvironment m n dirtProb moveKidProb t
+        empty = emptyEnvironment m n dirtProb moveKidProb t rndSeed
         crib = generateCrib empty m n kids
         obs =   generateObstacles crib totalObst
         dirt = generateDirt obs  totalDirt
@@ -62,8 +66,8 @@ generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKid
         env = putRobot kid 
     in  env
 
-emptyEnvironment ::Int -> Int -> Int -> Int -> Int -> Environment 
-emptyEnvironment m n dirtProb moveKidProb t  = Environment { 
+emptyEnvironment ::Int -> Int -> Int -> Int -> Int -> Int -> Environment 
+emptyEnvironment m n dirtProb moveKidProb t rndSeed = Environment { 
     size = (m,n)
     , robot = Robot{pos = (0,0), isHoldingKid = False}
     , kids = []
@@ -75,7 +79,7 @@ emptyEnvironment m n dirtProb moveKidProb t  = Environment {
     , dirtProb = dirtProb
     , moveKidProb = moveKidProb
     , remaininKids = 0
-    , randomGen =mkStdGen 10
+    , randomGen =mkStdGen rndSeed
     , time = t
     , turn = 0
     }
@@ -93,7 +97,7 @@ putRobot env  =
         (rnd,gen) = myRandom 0 (length' emptyOld) (randomGen env) 
         elem = (emptyOld)!!rnd
         emptyNew = remove emptyOld elem
-        itemNew = Robot elem False 
+        itemNew = Robot elem False
         env2 = env{empty =emptyNew , robot = itemNew , randomGen = gen} 
       
     in env2
@@ -147,30 +151,12 @@ generateDirt env items =
       
     in generateDirt env2  (items-1)
 
+--------------------------------------------------
 
 
-getTile:: Environment -> Coord -> Char
-getTile env c 
-    | isRobot         env c = '*'--'🤖'
-    | isRobotWithKid  env c = '+'--'⚠️' 
-    | isKid           env c = '@'--'👶🏻'
-    | isCrib          env c = 'o'--'🟢'
-    | isFullCrib      env c = 'O'--'🔴'
-    | isDirty         env c = '#'--'💩'
-    | isObstacle      env c = 'X'--'❌'
-    | isEmpty         env c = '_'--'⬜️'
 
-showEnvironment :: Environment -> String
-showEnvironment env = unlines tileLines
-  where
-    (sizeX, sizeY) = size env
-    tileLines = [[getTile env (y, x) | x <- [0..sizeY-1]]
-                                     | y <- [0..sizeX-1]]
 
-renderToConsole :: Environment -> IO()
-renderToConsole =
-  putStrLn . showEnvironment
-
+---Variations
 
 -- passTime::Environment -> Environment
 -- passTime = variateEnvironment $ variateAgents env
@@ -180,6 +166,10 @@ variateEnvironment env = env
 
 agentsActions::Environment -> Environment
 agentsActions env = env
+
+--------------------------------
+
+-----Kids Actions----------------
 
 kidsActions::Environment -> Environment
 kidsActions env =
@@ -296,19 +286,55 @@ putDirt env (x,y) (posKidX,posKidy) dirtProb  =
         emptyNew = filter (`notElem` dirtyCells2) emptyOld
     in env{dirty = dirtyCells2,empty = emptyNew }
       
+-------------------------------------------------------------
 
 
+----Robot Actions-----
+
+moveRobot ::Environment -> Coord ->Coord -> Environment
+moveRobot env src dest = 
+    let 
+        emptyOld = empty env
+        emptyNew = src:(remove emptyOld dest)
+        newRobot = robot env
+    in env{robot = newRobot{pos = dest} ,empty = emptyNew}
+
+moveAndTake ::Environment -> Coord ->Coord -> Environment
+moveAndTake env src dest = 
+    let 
+        emptyOld = empty env
+        emptyNew = src:(remove emptyOld dest)
+        kidsOld = kids env
+        kidsNew = remove kidsOld (initKid dest)
+        newRobot = robot env
+    in env {robot = newRobot{pos = dest , isHoldingKid =True},kids = kidsNew , empty = emptyNew}
+
+drop::Environment -> Coord  -> Environment
+drop env coord = 
+    let 
+        newKids =initKid coord:(kids env)
+        newRobot = robot env
+        newCrib = remove (crib env) coord
+        newFullCrib = coord:(fullCrib env)
+    in if isCrib env coord then env{robot = newRobot{isHoldingKid = False},crib = newCrib ,fullCrib = newFullCrib} else env {robot = newRobot{isHoldingKid = False}, kids = newKids}
+
+clean::Environment -> Coord  -> Environment
+clean env coord = 
+    let
+        newDirt =remove (dirty env) coord
+    in env {dirty = newDirt}
+----------------------
+
+-----Checkers----------------------
 
 isRobot :: Environment -> Coord  -> Bool
 isRobot env coord = pos (robot env) ==coord && not (isHoldingKid (robot env))
 
 isRobotWithKid :: Environment -> Coord  -> Bool
-isRobotWithKid  env coord = pos (robot env) ==coord && not (isHoldingKid (robot env))
-
+isRobotWithKid  env coord = pos (robot env) ==coord &&  (isHoldingKid (robot env))
 
 isEmpty :: Environment -> Coord  -> Bool
 isEmpty env coord = coord `elem` empty env
-
 
 isKid :: Environment -> Coord  -> Bool
 isKid  env coord= coord `elem` (map position (kids env)) 
@@ -322,7 +348,34 @@ isFullCrib  env coord= coord `elem` fullCrib  env
 isDirty ::Environment -> Coord  -> Bool
 isDirty  env coord= coord `elem` dirty  env 
 
-
 isObstacle :: Environment -> Coord  -> Bool
 isObstacle  env coord= coord `elem` obstacle  env 
 
+----------------------------------
+
+
+-----IO-------------
+
+getTile:: Environment -> Coord -> Char
+getTile env c 
+    | isRobot         env c = '*'--'🤖'
+    | isRobotWithKid  env c = '+'--'⚠️' 
+    | isKid           env c = '@'--'👶🏻'
+    | isCrib          env c = 'o'--'🟢'
+    | isFullCrib      env c = 'O'--'🔴'
+    | isDirty         env c = '#'--'💩'
+    | isObstacle      env c = 'X'--'❌'
+    | isEmpty         env c = '_'--'⬜️'
+
+showEnvironment :: Environment -> String
+showEnvironment env = unlines tileLines
+  where
+    (sizeX, sizeY) = size env
+    tileLines = [[getTile env (y, x) | x <- [0..sizeY-1]]
+                                     | y <- [0..sizeX-1]]
+
+renderToConsole :: Environment -> IO()
+renderToConsole =
+  putStrLn . showEnvironment
+
+---------------------------------
