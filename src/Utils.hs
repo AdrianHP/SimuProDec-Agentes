@@ -40,8 +40,6 @@ move (x,y) DownDown   = (x+2,y)
 move (x,y) LeftLeft   = (x,y-2)
 move (x,y) RightRight = (x,y+2)
 
-
-
 bfs:: [Coord] ->[Coord ]  -> Int -> [Coord ]
 bfs (queue:r) limits  count = bfs2 (queue:r) r limits count
                     
@@ -54,6 +52,16 @@ bfs2  (q:rest) visit limits count
                             | otherwise = bfs2 neighbors v limits (count-1)
                             where  neighbors = rest ++ findNeighbors  q limits
                                    v = q:visit
+
+
+-- bfs:: [Coord] ->[Coord ]  -> Int -> [Coord ]
+-- bfs (queue:r) limits  count = bfs2 (queue:r) r limits count
+                    
+
+
+
+emptyList:: Int ->[Coord]
+emptyList n = [(-1,-1) | x<-[1..n]]
 
 
 findNeighbors :: Coord ->[Coord]  -> [Coord]
@@ -80,12 +88,6 @@ assertProb prob (c:rest) gen =
               in result
           else  assertProb prob rest gen2
       
-
-
-
-
-
-
 
 data Queue a = Queue [a] deriving (Show)
 

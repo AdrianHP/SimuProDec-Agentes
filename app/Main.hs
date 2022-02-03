@@ -7,45 +7,48 @@ import Environment
 import Utils 
 import System.Random
 import Kid
+import Utils
+import Control.Applicative (Alternative(empty))
+import Environment (makePath, closestObjects)
 main :: IO ()
 --Probar movimiento del ninho
 
 main =do
-      -- print $ show  k2
-      renderToConsole env
-      renderToConsole env2
-      renderToConsole env3
-      renderToConsole env4
-      renderToConsole env5
-      renderToConsole env6
-      print $ show env7
-      renderToConsole env7
-      renderToConsole env8
-      renderToConsole env9
-      renderToConsole env10
+      simulate env 35 3
+--      print $show bf
+--      print $show p
+      -- renderToConsole env
+      -- renderToConsole env2
+      -- renderToConsole env3
+      -- renderToConsole env4
+      -- renderToConsole env5
+      -- renderToConsole env6
+      -- -- print $ show env7
+      -- renderToConsole env7
+      -- renderToConsole env8
+      -- renderToConsole env9
+      -- renderToConsole env10
      
       
-      where env = generateEnvironment 5 5 2 10 10 50 50 3 10  --testEnvironment
-            env2 = moveRobot env (0,1) (1,1)
-            env3 = clean env2  (1,1)
-            env4 = moveRobot env3 (1,1) (1,2)
-            env5 = moveRobot env4 (1,2) (1,3)
-            env6 = moveRobot env5 (1,3) (2,3)
-            env7 = moveAndTake env6 (2,3) (3,3)
-            env8 = moveRobot env7 (3,3) (3,4)
-            env9 = Environment.drop env8 (3,4) 
-            env10 = moveRobot env9 (3,4) (3,3)
-            -- kid = Kid (0,0) False False
-            -- kids = [kid,kid,kid]
-            -- k2 = map position kids
+      where env = generateEnvironment 5 5 3 10 10 100 100 3 10  --testEnvironment
+      --       env2 = chooseAction env True 
+      --       env3 = chooseAction env2 True 
+      --       env4 = chooseAction env3 True 
+      --       env5 = chooseAction env4 True 
+      --       env6 = chooseAction env5 True 
+      --       env7 = chooseAction env6 True 
+      --       env8 = chooseAction env7 True 
+      --       env9 = chooseAction env8 True 
+      --       env10 = chooseAction env9 True 
+            -- l = emptyList 10
+            -- (bf,p) = bfsKid env [(0,0)] [] [(5,5)] (emptyList 25) 25 
+            -- path = makePath [] p (4,2) 5
+            -- bf = closestObjects env (0,0)
 
-
--- main = do
-
---   hSetEcho stdin False
---   hSetBuffering stdin NoBuffering
---   hSetBuffering stdout NoBuffering
-
---   lvl <- loadLevel "level1.lvl"
---   renderToConsole lvl
---   gameLoop lvl
+simulate::Environment -> Int -> Int ->IO()
+simulate env 0 _ = print "End Simulation"
+simulate env time t = do
+      renderToConsole env
+      simulate env2 (time-1) t
+      where 
+            env2 = chooseAction env True
