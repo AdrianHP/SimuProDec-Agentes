@@ -27,6 +27,9 @@ data Environment = Environment {
                 ,  randomGen :: StdGen
                 ,  time ::Int
                 ,  turn ::Int
+                ,  kidPriorityRobot::Bool
+                ,  modelRobot::Int
+                , testMode :: Bool 
                 } deriving (Eq ,Show)
 
 -------------------------------------------
@@ -34,30 +37,32 @@ data Environment = Environment {
 
 -- Generator-------------------------------
 
-testEnvironment ::  Environment
-testEnvironment  = Environment {
-    size = (4,5)
-    , robot = Robot{pos = (0,0), isHoldingKid = False ,prevPos= (0,0) }
-    , kids = [initKid (2,1),initKid (2,3)]
-    , crib = []
-    , fullCrib = []
-    , dirty = []
-    , obstacle = [(1,2)]
-    , empty =  [(0,1),(1,1),(0,2),(0,3),(0,4),(1,0),(1,4),(2,0),(1,3),(2,2),(2,4),(3,0),(3,1),(3,2),(3,3),(3,4)]
-    , dirtProb = 100
-    , moveKidProb = 10
-    , remaininKids = 1
-    , randomGen =mkStdGen 10
-    , time = 0
-    , turn = 0
-    }
+-- setEnvironment ::  Environment
+-- setEnvironment  = Environment {
+--     size = (4,5)
+--     , robot = Robot{pos = (0,0), isHoldingKid = False ,prevPos= (0,0) }
+--     , kids = [initKid (2,1),initKid (2,3)]
+--     , crib = []
+--     , fullCrib = []
+--     , dirty = []
+--     , obstacle = [(1,2)]
+--     , empty =  [(0,1),(1,1),(0,2),(0,3),(0,4),(1,0),(1,4),(2,0),(1,3),(2,2),(2,4),(3,0),(3,1),(3,2),(3,3),(3,4)]
+--     , dirtProb = 100
+--     , moveKidProb = 10
+--     , remaininKids = 1
+--     , randomGen =mkStdGen 10
+--     , time = 0
+--     , turn = 1
+--     , testMode = False 
 
-generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int ->Int -> Int -> Environment
-generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb t rndSeed =
+--     }
+
+generateEnvironment :: Int -> Int -> Int -> Int -> Int -> Int -> Int ->Int -> Int -> Bool -> Int-> Bool -> Environment 
+generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKidProb t rndSeed kidPriority model test =
     let
         totalObst = div (obstaclesPercentage * m * n)  100
         totalDirt = div  ( dirtPercentage * m * n )  100
-        empty = emptyEnvironment m n dirtProb moveKidProb t rndSeed
+        empty = emptyEnvironment m n dirtProb moveKidProb t rndSeed  kidPriority model test
         crib = generateCrib empty m n kids
         obs =   generateObstacles crib totalObst
         dirt = generateDirt obs  totalDirt
@@ -65,8 +70,8 @@ generateEnvironment m n kids obstaclesPercentage dirtPercentage dirtProb moveKid
         env = putRobot kid
     in  env
 
-emptyEnvironment ::Int -> Int -> Int -> Int -> Int -> Int -> Environment
-emptyEnvironment m n dirtProb moveKidProb t rndSeed = Environment {
+emptyEnvironment ::Int -> Int -> Int -> Int -> Int -> Int ->Bool ->Int -> Bool -> Environment
+emptyEnvironment m n dirtProb moveKidProb t rndSeed  kidPriority model test = Environment {
     size = (m,n)
     , robot = Robot{pos = (0,0), isHoldingKid = False,prevPos= (0,0)}
     , kids = []
@@ -80,7 +85,10 @@ emptyEnvironment m n dirtProb moveKidProb t rndSeed = Environment {
     , remaininKids = 0
     , randomGen =mkStdGen rndSeed
     , time = t
-    , turn = 0
+    , turn = 1
+    , kidPriorityRobot = kidPriority
+    , modelRobot = model
+    , testMode =test
     }
 
 initEmptys :: Int -> Int -> Int -> [Coord] ->[Coord]
@@ -153,19 +161,29 @@ generateDirt env items =
 --------------------------------------------------
 
 
-
-
 ---Variations
 
--- passTime::Environment -> Environment
--- passTime = variateEnvironment $ variateAgents env
+passTime::Environment -> Environment
+passTime env = if testMode env then trace("turno " ++show (turn env) ) env3{ turn = (turn env)+1} else env3{ turn = (turn env)+1}
+    where
+        (_,var) = divMod (turn env) (time env)
+        variate = var==0 && (turn env) >0
+        env1 = robotAction env (kidPriorityRobot env) (modelRobot env)
+        env2 = kidsActions env1
+        
+
+        env3 =if  variate then  variateEnvironment env2 else env2
+
 
 variateEnvironment::Environment -> Environment
-variateEnvironment env = env
+variateEnvironment env =if testMode env then  trace"El ambiente ha variado aleatoriamente"  env else env
 
-agentsActions::Environment -> Environment
-agentsActions env = env
-
+success::Environment -> (Bool,Float)
+success env = (dirtPercent<40,dirtPercent)
+    where
+        dirt = length' (dirty env)
+        empt = length' (empty env)
+        dirtPercent = dirt *100/(dirt+empt)
 --------------------------------
 
 
@@ -179,7 +197,6 @@ kidsActions env =
         (temp,gen) = assertProb moveProb (kids env) (randomGen env)
         kidsToMove = map position temp
         envAfterMove = foldl (\ env k -> moveKid env k (dirtProb env)) env kidsToMove
-        i =  trace("kids to move" ++show kidsToMove ++ show envAfterMove)
     in envAfterMove
 
 
@@ -197,7 +214,7 @@ moveKid env (x,y) dirtProb =
               envIfCanMov = env2{kids =kidsNew , empty = emptyNew}
               envIfCanMovPutDirt = putDirt envIfCanMov (x,y) newPos dirtProb
               envPutDirt = putDirt env (x,y) (x,y) dirtProb
-            in if canMove then trace("Obstacle and move ") envIfCanMovPutDirt{randomGen = gen} else trace("Obstacle no Move") env{randomGen = gen}
+            in if canMove then  envIfCanMovPutDirt{randomGen = gen} else  env{randomGen = gen}
         else if isEmpty env newPos then
             let
               emptyOld = empty env
@@ -206,9 +223,9 @@ moveKid env (x,y) dirtProb =
               kidsNew = (initKid newPos):(remove kidsOld (initKid (x,y)))
               env2 = env{kids =kidsNew , empty = emptyNew}
               envPutDirt = putDirt env2 (x,y) newPos dirtProb
-            in  trace("Emty and move ") envPutDirt{randomGen = gen}
-            else trace("Not Emty  ")  env{randomGen = gen}
-    else trace("else ")  env{randomGen = gen}
+            in   envPutDirt{randomGen = gen}
+            else env{randomGen = gen}
+    else  env{randomGen = gen}
 
 
     where (rnd,gen) =  myRandom 0 4 (randomGen env )
@@ -321,14 +338,10 @@ clean env coord =
 
 ----ReflexRobot--------------
 
-chooseAction::Environment ->Bool  -> Environment
-chooseAction env kidPriority 
-    | clean && not loaded =trace "Ambiente sin suciedad y bebes en el corral,nada que hacer" env
-    | otherwise =
-                let
-                    
-
-                in if loaded then loadedAction env kidPriority False  else  unloadedAction  env kidPriority
+robotAction::Environment ->Bool ->Int  -> Environment
+robotAction env kidPriority model
+    | clean && not loaded =if (testMode env) then trace "Ambiente sin suciedad y bebes en el corral,nada que hacer" env else env
+    | otherwise = if loaded then loadedAction env kidPriority False model  else  unloadedAction  env kidPriority model
     where 
     loaded = isHoldingKid (robot env)
     clean = length' (kids env) == 0 && length' (dirty env) ==0
@@ -337,8 +350,8 @@ chooseAction env kidPriority
 
 
 
-unloadedAction:: Environment -> Bool -> Environment
-unloadedAction env kidPriorityIn =
+unloadedAction:: Environment -> Bool ->Int-> Environment
+unloadedAction env kidPriorityIn model =
     let
         kidPriority = if kidPriorityIn &&length' (kids env) == 0 || not kidPriorityIn && length' (dirty env) ==0 
                             then not kidPriorityIn 
@@ -352,7 +365,7 @@ unloadedAction env kidPriorityIn =
         
         bestPosibleMoves  
                 | (length' anyKid > 0 && kidPriority) || (length' anyDirt > 0 && not kidPriority) =(0,0)
-                | anyEnvTarget = (makePath [] closeTargetParents  closeTargetCoord (fst (size env) ))!!1
+                | anyEnvTarget = (makePath [] closeTargetParents  closeTargetCoord (snd (size env) ))!!1
                 | length' temp >0 =  temp!!0
                 | otherwise  = (-1,-1)
                 where
@@ -364,20 +377,21 @@ unloadedAction env kidPriorityIn =
         fullCribs = filter (isFullCrib env) neighbors
 
         (str,resultEnv )
-                 | isDirty env actualPos = ( "Limpia", clean env actualPos)
-                 | length' anyKid > 0 && kidPriority  = ( "Carga bebe" , moveAndTake env actualPos (anyKid!!0) )
+                 | isDirty env actualPos  && ( model ==0 ||not kidPriority) = ( "Limpia", clean env actualPos)
+                 | length' anyKid > 0  = ( "Se mueve hacia el bebe adyacente y lo carga" , moveAndTake env actualPos (anyKid!!0) )
                  | length' anyDirt > 0 && not kidPriority  = ( "Se mueve para lugar con suciedad" , moveRobot env actualPos (anyDirt!!0) )
-                 | bestPosibleMoves /=(-1,-1)  = ( "Busca "++if kidPriority then "el bebe" else "la suciedad" ++ " mas cercan@"  , moveRobot env actualPos bestPosibleMoves)
-                 | length' fullCribs > 0 =( "No puede moverse,la unica opcion es meterse en un carral y cargar bebe" , moveAndTake env actualPos (fullCribs!!0) )
+                 | bestPosibleMoves /=(-1,-1)  = ( "Busca "++if kidPriority then "el bebe mas cercano" else "la suciedad mas cercana"  , moveRobot env actualPos bestPosibleMoves)
+                 | isDirty env actualPos   = ( "Limpia", clean env actualPos)
+                 | length' fullCribs > 0 =( "No puede moverse,la unica opcion es meterse en un corral y cargar bebe" , moveAndTake env actualPos (fullCribs!!0) )
                  | otherwise =  ( "No se puede mover" ,env)
 
 
 
-        in trace (str++". Se mueve de "++ show actualPos++" ->"++show (pos (robot resultEnv))   ) resultEnv
+        in if (testMode env) then trace (str++"......... src -> dest "++ show actualPos++" ->"++show (pos (robot resultEnv))   ) resultEnv else resultEnv
 
 
-loadedAction:: Environment -> Bool -> Bool  -> Environment
-loadedAction env kidPriority stop =
+loadedAction:: Environment -> Bool -> Bool ->Int  -> Environment
+loadedAction env kidPriority stop model =
     let
         actualPos =pos (robot env)
         neighbors = findNeighbors actualPos ([size env])
@@ -385,7 +399,7 @@ loadedAction env kidPriority stop =
         
         bestPosibleMoves 
                 |length' anyCrib>0 = (0,0)
-                | anyEnvTarget = (makePath [] closeTargetParents  closeTargetCoord (fst (size env) ))!!1
+                | anyEnvTarget = (makePath [] closeTargetParents  closeTargetCoord (snd (size env) ))!!1
                 | length' temp >0 =  temp!!0
                 | otherwise  = (-1,-1)
 
@@ -398,17 +412,19 @@ loadedAction env kidPriority stop =
               
 
         (str,resultEnv )
-                 | isDirty env actualPos && not stop  = ( "Limpia", clean env actualPos)
+                 | isDirty env actualPos && not stop &&model==0  = ( "Limpia", clean env actualPos)
                  | isCrib env actualPos && not stop  = ( "Deja al bebe en el corral", dropKid env actualPos)
                  | length' anyCrib > 0   =  ( "Se mueve para un corral" , moveAndTake env actualPos (anyCrib!!0) )
                  | bestPosibleMoves /=(-1,-1)  = if not stop  then 
                                                     let
                                                         env2 = moveRobot env actualPos bestPosibleMoves
-                                                     in ("Busca el corrarl mas cecano y se puede seguir moviendo", loadedAction env2 kidPriority True) 
+                                                     in ("Busca el corrarl mas cecano y se puede seguir moviendo", loadedAction env2 kidPriority True model) 
                                                  else ( "Busca el corral mas cercano ya no se puede mover mas"  , moveRobot env actualPos bestPosibleMoves)
+                 | isDirty env actualPos && not stop  = ( "Limpia", clean env actualPos)
                  | otherwise =  ( "Deja al bebe" ,env)
 
-        in trace (str++ ". Se mueve de "++ show actualPos++" ->"++ show (pos (robot resultEnv))  ) resultEnv
+        in if (testMode env) then trace (str++"......... src -> dest "++ show actualPos++" ->"++show (pos (robot resultEnv))   ) resultEnv else resultEnv
+
 -----------------------------
 
 
@@ -496,17 +512,8 @@ fstMatch env list index predicate =
         coord = list!!index
     in if predicate env coord then coord  else fstMatch env list (index-1) predicate
 
-absClose :: Coord -> Coord -> Coord  -> Coord
-absClose (i,j) (k,l) (x,y) | absCoord1X > absCoord2X =(k,l)
-                           | absCoord1X < absCoord2X = (i,j)
-                           | absCoord1Y > absCoord2Y = (k,l)
-                           | otherwise = (i,j)
 
-    where
-        absCoord1X= abs (i-x)
-        absCoord2X= abs (k-x)
-        absCoord1Y= abs (j-y)
-        absCoord2Y = abs (l-y)
+  
 
 
 
@@ -518,11 +525,11 @@ bfsPath env  (q:rest) visit limits path count
                             | otherwise =
                                 let
                                     v = q:visit
-                                    (m,_) = size env
+                                    (_,columns) = size env
                                     n= filter  ( \temp->temp `notElem` v && canMove env temp) (findNeighbors  q limits)
-                                    neiToInt = map  (\(x,y)-> x*m+y)  n
+                                    neiToInt = map  (\(x,y)-> x*columns+y)  n
                                     updateP = updatePath [] path neiToInt q ((length' path)-1 )
-                                    neighbors = rest ++ n --trace("index"++show neiToInt++" " ++show q ++show updateP )
+                                    neighbors = rest ++ n 
                                 in  bfsPath env neighbors v limits updateP (count-1)
 
 bfsKid::Environment -> [Coord ] -> [Coord ] -> [Coord ] ->[Coord] ->Int ->([Coord],[Coord])
@@ -533,13 +540,13 @@ bfsKid env  (q:rest) visit limits path count
                             | otherwise =
                                 let
                                     v = q:visit
-                                    (m,_) = size env
+                                    (_,columns) = size env
                                     t = filter  ( isKid env) (findNeighbors  q limits)
                                     anyKid = length' t>0
                                     n= if anyKid then [t!!0] else  filter  ( \temp->temp `notElem` v && canMove env temp) (findNeighbors  q limits)
-                                    neiToInt = map  (\(x,y)-> x*m+y)  n
+                                    neiToInt = map  (\(x,y)-> x*columns+y)  n
                                     updateP = updatePath [] path neiToInt q ((length' path)-1 )
-                                    neighbors = rest ++ n --trace("index"++show neiToInt++" " ++show q ++show updateP )
+                                    neighbors = rest ++ n 
                                 in if anyKid then bfsKid env neighbors (t!!0:v) limits updateP 0 else bfsKid env neighbors v limits updateP (count-1)
 
 
@@ -547,21 +554,6 @@ bfsKid env  (q:rest) visit limits path count
 
 
 
-
-updatePath::[Coord] ->[Coord]->[Int]->Coord -> Int->[Coord]
-updatePath result _ _ _ (-1) = result
-updatePath result (p:path) nIndex c len =
-    if len `elem` nIndex && ((p:path)!!len) ==(-1,-1) then
-        updatePath (c:result) (p:path) nIndex c (len-1)
-    else
-        updatePath (((p:path))!!len:result) (p:path) nIndex c (len-1)
-
-
-makePath:: [Coord] -> [Coord] -> Coord ->Int -> [Coord]
-makePath  result path (x,y) m = if path!!index==(-1,-1) then result else makePath (newCoord:result) path newCoord m
-                         where
-                             index = x*m+y
-                             newCoord = path!!index
 
 
 -------------------------

@@ -87,7 +87,25 @@ assertProb prob (c:rest) gen =
                   result = (c:list,gen)
               in result
           else  assertProb prob rest gen2
-      
+
+updatePath::[Coord] ->[Coord]->[Int]->Coord -> Int->[Coord]
+updatePath result _ _ _ (-1) = result
+updatePath result (p:path) nIndex c len =
+    if len `elem` nIndex && ((p:path)!!len) ==(-1,-1) then
+        updatePath (c:result) (p:path) nIndex c (len-1)
+    else
+        updatePath (((p:path))!!len:result) (p:path) nIndex c (len-1)
+
+
+makePath:: [Coord] -> [Coord] -> Coord ->Int -> [Coord]
+makePath  result path (x,y) n = if path!!index==(-1,-1) then result else makePath (newCoord:result) path newCoord n
+                         where
+                             index = x*n+y
+                             newCoord = path!!index
+
+
+
+
 
 data Queue a = Queue [a] deriving (Show)
 
