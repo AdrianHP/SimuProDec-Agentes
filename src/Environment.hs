@@ -421,7 +421,7 @@ loadedAction env kidPriority stop model =
                                                      in ("Busca el corrarl mas cecano y se puede seguir moviendo", loadedAction env2 kidPriority True model) 
                                                  else ( "Busca el corral mas cercano ya no se puede mover mas"  , moveRobot env actualPos bestPosibleMoves)
                  | isDirty env actualPos && not stop  = ( "Limpia", clean env actualPos)
-                 | otherwise =  ( "Deja al bebe" ,env)
+                 | otherwise =  ( "Deja al bebe" ,dropKid env actualPos)
 
         in if (testMode env) then trace (str++"......... src -> dest "++ show actualPos++" ->"++show (pos (robot resultEnv))   ) resultEnv else resultEnv
 
