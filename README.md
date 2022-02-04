@@ -201,10 +201,10 @@ La aplicación es un paquete del gestor de Haskell **stack**. Se usó Haskell *8
 
 Hay una función que muestra la simulación en consola paso a paso,para la misma la leyenda es la siguient 
 - @ : Niño 
-- * : Robot
-- + : Robot con niño 
-- _ : Casilla vacía 
-- # : Casilla con suciedad
+- \* : Robot
+- \+ : Robot con niño 
+- \_ : Casilla vacía 
+- \# : Casilla con suciedad
 - X : Obstáculo 
 
 
