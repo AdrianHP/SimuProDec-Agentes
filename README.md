@@ -183,6 +183,21 @@ Después de varios experimentos con juegos de datos distintos se pudo observar q
 
 Ahora el modelo 3 tiene una cosa negativa debido a que si en algún momento el robot queda trabado y no se puede mover más,entonces todas las casillas que decidió no limpiar cuando tuvo la oportunidad para limpiarlas después quedaron sucias,este modelo funcionaría mejor si se mejora la estrategia de poner los niños en el corral,ya que la que posee solo busca la mas cercana,que es probable que obstruya a la hora de poner otros niños, pienso que si se mejora esta estrategia de poner los niños en el corral tuviera mejores resultados, incluso mejores que los otros dos modelos,pero con la estrategia actual fue el modelo que presentó los peores resultados.El modelos 2 también se ve afectado si el robot se traba,pero mucho menos ya el el si limpió cuando tuvo la oportunidad.El modelo 2 es un intermedio entre el uno y el 3 por eso presentó los mejores resultados,aunque recalco, mejorando algunas estrategias el modelo 3 podría mejorar su resultados en gran media,incluso superar los demás.
 
+## Aplicación
+
+La aplicación es un paquete del gestor de Haskell **stack**. Se usó Haskell *8.10.7* y no la versión más reciente en el momento por problemas de compatibilidad con las herramienta usadas en el desarrollo de esta.
+
+### Instalación
+
+1. Instalar **stack**
+    - Referirse a la [documentación](https://docs.haskellstack.org/en/stable/install_and_upgrade/) para instalar el gestor en dependencia del sistema operativo que se use.
+2. Descargar la versión de Haskell necesaria
+    - **stack setup 8.10.7**
+
+### Ejecutar aplicación
+
+1. Abrir consola en la carpeta raíz del proyecto
+2. Ejecutar **stack run**
 
 
 
