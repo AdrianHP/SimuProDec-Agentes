@@ -206,6 +206,7 @@ Hay una función que muestra la simulación en consola paso a paso,para la misma
 - \_ : Casilla vacía 
 - \# : Casilla con suciedad
 - X : Obstáculo 
-
+- o : Corral
+- O : Niño en corral
 
 
